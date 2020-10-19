@@ -10,8 +10,7 @@
  * You may change this to fit your implementation.
  */
 
-struct memoryList
-{
+struct memoryList {
     // doubly-linked list
     struct memoryList *prev;
     struct memoryList *next;
@@ -49,8 +48,7 @@ static struct memoryList *latest; // i use latest to point to the last one that 
    sz specifies the number of bytes that will be available, in total, for all mymalloc requests.
 */
 
-void initmem(strategies strategy, size_t sz)
-{
+void initmem(strategies strategy, size_t sz) {
     myStrategy = strategy;
 
     /* all implementations will need an actual block of memory to use */
@@ -96,8 +94,7 @@ void initmem(strategies strategy, size_t sz)
  *  Restriction: requested >= 1
  */
 
-void *mymalloc(size_t requested)
-{
+void *mymalloc(size_t requested) {
     // i first check if there is enough space in the whole memory (without considering used space), if not return NULL
     if (requested > mySize){return NULL;}
     assert((int)myStrategy > 0);
@@ -238,8 +235,7 @@ void *mymalloc(size_t requested)
 
 
 /* Frees a block of memory previously allocated by mymalloc. */
-void myfree(void* block)
-{
+void myfree(void* block) {
     // make a struct for traversing the memory and set it to first place in memory
     struct memoryList *trav;
     trav=head->next;
@@ -265,99 +261,98 @@ void myfree(void* block)
  */
 
 /* Get the number of contiguous areas of free space in memory. */
-int mem_holes()
-{
+int mem_holes() {
+    // first i make a struct to traverse the memory
     struct memoryList *trav;
+    // set the traversal to first allocated memory location
     trav=head->next;
-    if(trav != NULL) {
+    if(trav != NULL) { //check if it is NULL
         int holes = 0;
-        if (trav->placement != 0){holes++;}
-        while (trav->next != NULL) {
-            if (trav->placement + trav->size != trav->next->placement) {
+        if (trav->placement != 0){holes++;} //if the first located memory is not at point 0 then there is a hole
+        while (trav->next != NULL) { //go until the end of the memory
+            if (trav->placement + trav->size != trav->next->placement) { //if the next memory is not right after the size of this memory then there is a hole
                 holes++;
             }
-            trav = trav->next;
+            trav = trav->next; //go to next
         }
-        if (trav->placement+trav->size < head->size){holes++;}
+        if (trav->placement+trav->size < head->size){holes++;} //check if there is a hole in the end (the placement+size is not the same as the size of the whole memory)
         return holes;
     }
-    if (mySize>0) return 1;
+    if (mySize>0) return 1; // if the first allocated is a NULL (nothing has been assigned) then return 1 if there is a memory assigned else return 0
     else return 0;
 }
 
 /* Get the number of bytes allocated */
 int mem_allocated()
 {
+    // the full size minus the size that is not allocated on the memory
     return head->size-mySize;
 }
 
 /* Number of non-allocated bytes */
-int mem_free()
-{
+int mem_free() {
+    // return the size that is not allocated on the memory
     return mySize;
 }
 
 /* Number of bytes in the largest contiguous area of unallocated memory */
 int mem_largest_free() {
+    // first make a struct used to traverses memory and set it to the first allocated-
     struct memoryList *trav;
     trav = head->next;
     int largestHole = 0;
-    if (trav != NULL) {
-        if (trav->placement != 0) {
+    if (trav != NULL) { //check if something is allocated
+        if (trav->placement != 0) { // if the first allocated is not on space 0 then there is a hole which is from 0 to trav->placement
             largestHole = trav->placement;
         }
-        while (trav->next != NULL) {
-            if (trav->placement + trav->size != trav->next->placement) {
-                if (trav->next->placement - (trav->placement + trav->size) > largestHole) {
+        while (trav->next != NULL) { //check until end of memory
+            if (trav->placement + trav->size != trav->next->placement) { // check if they are just beside eachother (placement + size equals start of next allocated memory)
+                if (trav->next->placement - (trav->placement + trav->size) > largestHole) { // here i check if the hole is bigger than the previous
                     largestHole = trav->next->placement - (trav->placement + trav->size);
                 }
             }
-            trav = trav->next;
+            trav = trav->next; // go to next memory
         }
-        if (trav->placement + trav->size < head->size) {
-            if (head->size - (trav->placement + trav->size) > largestHole) {
+        if (trav->placement + trav->size < head->size) { // check if there is a hole in the end of the memory
+            if (head->size - (trav->placement + trav->size) > largestHole) { // check if hole is bigger than previous biggest
                 largestHole = head->size - (trav->placement + trav->size);
             }
         }
-
-        if (largestHole < head->size - (trav->placement + trav->size)) {
-            return head->size - (trav->placement + trav->size);
-        }
         return largestHole;
-    } else return head->size;
+    } else return head->size; // if trav equals NULL from first placement then there is not assigned anything so biggest is whole memory
 }
 
 /* Number of free blocks smaller than "size" bytes. */
-int mem_small_free(int size)
-{
+int mem_small_free(int size) {
+    // traversal struct set to first allocated memory
     struct memoryList *trav;
     trav=head->next;
-    if(trav != NULL) {
+    if(trav != NULL) { //check if something is allocated
         int holes = 0;
-        while (trav->next != NULL) {
-            if (trav->placement + trav->size != trav->next->placement && trav->next->placement - (trav->placement+trav->size) > size) {
+        while (trav->next != NULL) { //check if you reached the end of memory
+            if (trav->placement + trav->size != trav->next->placement && trav->next->placement - (trav->placement+trav->size) > size) { // check if there is a hole at first and then check if it is smaller than size
                 holes++;
             }
-            trav = trav->next;
+            trav = trav->next; //go to next allocated memory
         }
-        if (trav->placement+trav->size < head->size){holes++;}
+        if (trav->placement+trav->size < head->size){holes++;} // on the last allocated memory check if there is enough space until you reach the end of the whole memory
         return holes;
     }
-    if (mySize>0) return 1;
+    if (mySize>0) return 1; //if no malloc has been initialized check if memory has been initialized, if yes return 1 hole else 0
     else return 0;
 }
 
-char mem_is_alloc(void *ptr)
-{
+char mem_is_alloc(void *ptr) {
+    // make a struct to travers
     struct memoryList *trav;
     trav=head->next;
-    while(trav != NULL) {
-        if (trav->ptr == ptr) {
+    while(trav != NULL) { //check if it is NULL
+        if (trav->ptr == ptr) { //if the pointer is found then return y for yes
             return 'y';
         }
         trav = trav->next;
     }
-    return 'n';
+    return 'n'; //nothing is found therefore return n for no
 }
 
 /*
@@ -367,23 +362,19 @@ char mem_is_alloc(void *ptr)
 
 
 //Returns a pointer to the memory pool.
-void *mem_pool()
-{
+void *mem_pool() {
     return myMemory;
 }
 
 // Returns the total number of bytes in the memory pool. */
-int mem_total()
-{
+int mem_total() {
     return head->size;
 }
 
 
 // Get string name for a strategy.
-char *strategy_name(strategies strategy)
-{
-    switch (strategy)
-    {
+char *strategy_name(strategies strategy) {
+    switch (strategy) {
         case Best:
             return "best";
         case Worst:
@@ -398,26 +389,20 @@ char *strategy_name(strategies strategy)
 }
 
 // Get strategy from name.
-strategies strategyFromString(char * strategy)
-{
-    if (!strcmp(strategy,"best"))
-    {
+strategies strategyFromString(char * strategy) {
+    if (!strcmp(strategy,"best")) {
         return Best;
     }
-    else if (!strcmp(strategy,"worst"))
-    {
+    else if (!strcmp(strategy,"worst")) {
         return Worst;
     }
-    else if (!strcmp(strategy,"first"))
-    {
+    else if (!strcmp(strategy,"first")) {
         return First;
     }
-    else if (!strcmp(strategy,"next"))
-    {
+    else if (!strcmp(strategy,"next")) {
         return Next;
     }
-    else
-    {
+    else {
         return 0;
     }
 }
@@ -429,12 +414,12 @@ strategies strategyFromString(char * strategy)
  */
 
 /* Use this function to print out the current contents of memory. */
-void print_memory()
-{
+void print_memory() {
+    // traversal struct
     struct memoryList *trav = head->next;
-    while (trav != NULL) {
-        printf("%d\t%d\t%d\n", trav->placement, trav->size, trav->alloc);
-        trav = trav->next;
+    while (trav != NULL) { //check if it is NULL
+        printf("Placed at location: %d\tThe size is: %d\tThe memory ends at: %d\n", trav->placement, trav->size,trav->placement+trav->size); //print out some data taken from trav
+        trav = trav->next; //loop until end of memory
     }
 }
 
@@ -442,8 +427,7 @@ void print_memory()
  * This function does not depend on your implementation,
  * but on the functions you wrote above.
  */
-void print_memory_status()
-{
+void print_memory_status() {
     printf("%d out of %d bytes allocated.\n",mem_allocated(),mem_total());
     printf("%d bytes are free in %d holes; maximum allocatable block is %d bytes.\n",mem_free(),mem_holes(),mem_largest_free());
     printf("Average hole size is %f.\n\n",((float)mem_free())/mem_holes());
@@ -459,6 +443,7 @@ void try_mymem(int argc, char **argv) {
     if(argc > 1)
         strat = strategyFromString(argv[1]);
     else
+        // i just put this as standard because that is my task for the assignment
         strat = Next;
 
 
@@ -530,8 +515,8 @@ void try_mymem(int argc, char **argv) {
     printf("\n");
 
 
-    //print_memory();
-    //print_memory_status();
+    print_memory();
+    print_memory_status();
 
 }
 
