@@ -121,7 +121,7 @@ void *mymalloc(size_t requested)
                 trav = latest;
                 int startPlacement = trav->placement+trav->size;
                 int thisPlacement = trav->placement+trav->size;
-                if (thisPlacement+requested < head->size) {
+                if (thisPlacement+requested <= head->size) {
                     struct memoryList *temp = (struct memoryList *) malloc(sizeof(struct memoryList));
                     temp->size = requested;
                     temp->prev = trav;
@@ -430,7 +430,7 @@ void try_mymem(int argc, char **argv) {
     printf("%d bytes are free in %d holes; maximum allocatable block is %d bytes.\n",mem_free(),mem_holes(),mem_largest_free());
     printf("\n");
 
-    e = mymalloc(25);
+    e = mymalloc(200);
     printf("e allocated\n");
     print_memory();
     printf("%d bytes are free in %d holes; maximum allocatable block is %d bytes.\n",mem_free(),mem_holes(),mem_largest_free());
