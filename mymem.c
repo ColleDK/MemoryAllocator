@@ -115,42 +115,46 @@ void *mymalloc(size_t requested)
                 mySize=mySize-requested;
                 head->next=temp;
                 latest=temp;
-                return temp->ptr;
+                return latest->ptr;
             }
             else{
                 trav = latest;
                 int startPlacement = trav->placement+trav->size;
                 int thisPlacement = trav->placement+trav->size;
-                if (thisPlacement+requested < mySize) {
+                if (thisPlacement+requested < head->size) {
                     struct memoryList *temp = (struct memoryList *) malloc(sizeof(struct memoryList));
                     temp->size = requested;
                     temp->prev = trav;
                     temp->placement = thisPlacement;
                     temp->alloc = 1;
-                    temp->next = NULL;
+                    temp->next = trav->next;
+                    if (trav->next != NULL){
+                        trav->next->prev = temp;
+                    }
                     temp->ptr = temp;
                     mySize = mySize - requested;
                     trav->next = temp;
                     latest = temp;
-                    return temp->ptr;
+                    return latest->ptr;
                 }
                 else {
                     trav = head->next;
+                    int thisSpace;
                     while (trav->placement + trav->size != startPlacement) {
-                        thisPlacement = trav->next->next->placement - (trav->next->placement + trav->next->size + 1);
-                        if (thisPlacement > requested + 1) {
+                        thisSpace = trav->next->placement - (trav->placement + trav->size + 1);
+                        if (thisSpace >= requested) {
                             struct memoryList *temp = (struct memoryList *) malloc(sizeof(struct memoryList));
                             temp->size = requested;
                             temp->prev = trav;
-                            temp->placement = trav->next->placement + trav->next->size;
+                            temp->placement = trav->placement + trav->size;
                             temp->alloc = 1;
-                            temp->next = trav->next->next;
+                            temp->next = trav->next;
                             temp->ptr = temp;
-                            trav->next->next->prev = temp;
+                            trav->next->prev = temp;
                             trav->next = temp;
                             mySize = mySize - requested;
                             latest = temp;
-                            return trav->ptr;
+                            return latest->ptr;
                         }
                         trav = trav->next;
                     }
@@ -172,7 +176,9 @@ void myfree(void* block)
         if (trav->ptr == block) {
             trav->alloc = 0;
             trav->prev->next = trav->next;
-            trav->next->prev = trav->prev;
+            if (trav->next != NULL){trav->next->prev = trav->prev;}
+            mySize = mySize+trav->size;
+            if (trav == latest){latest = trav->prev;}
             break;
         }
         trav = trav->next;
@@ -190,18 +196,20 @@ int mem_holes()
 {
     struct memoryList *trav;
     trav=head->next;
-    if(trav == NULL){
-        return 1;
-    }
-    else{
+    if(trav != NULL) {
         int holes = 0;
-        while(trav->next != NULL){
-            if (trav->placement+trav->size+1 != trav->next->placement && trav->next->placement != 0){
+        if (trav->placement != 0){holes++;}
+        while (trav->next != NULL) {
+            if (trav->placement + trav->size != trav->next->placement) {
                 holes++;
             }
             trav = trav->next;
         }
+        if (trav->placement+trav->size < head->size){holes++;}
+        return holes;
     }
+    if (mySize>0) return 1;
+    else return 0;
 }
 
 /* Get the number of bytes allocated */
@@ -217,21 +225,66 @@ int mem_free()
 }
 
 /* Number of bytes in the largest contiguous area of unallocated memory */
-int mem_largest_free()
-{
-    return 0;
+int mem_largest_free() {
+    struct memoryList *trav;
+    trav = head->next;
+    int largestHole = 0;
+    if (trav != NULL) {
+        if (trav->placement != 0) {
+            largestHole = trav->placement;
+        }
+        while (trav->next != NULL) {
+            if (trav->placement + trav->size != trav->next->placement) {
+                if (trav->next->placement - (trav->placement + trav->size) > largestHole) {
+                    largestHole = trav->next->placement - (trav->placement + trav->size);
+                }
+            }
+            trav = trav->next;
+        }
+        if (trav->placement + trav->size < head->size) {
+            if (head->size - (trav->placement + trav->size) > largestHole) {
+                largestHole = head->size - (trav->placement + trav->size);
+            }
+        }
+
+        if (largestHole < head->size - (trav->placement + trav->size)) {
+            return head->size - (trav->placement + trav->size);
+        }
+        return largestHole;
+    }
 }
 
 /* Number of free blocks smaller than "size" bytes. */
 int mem_small_free(int size)
 {
-
-    return 0;
+    struct memoryList *trav;
+    trav=head->next;
+    if(trav != NULL) {
+        int holes = 0;
+        while (trav->next != NULL) {
+            if (trav->placement + trav->size != trav->next->placement && trav->next->placement - (trav->placement+trav->size) > size) {
+                holes++;
+            }
+            trav = trav->next;
+        }
+        if (trav->placement+trav->size < head->size){holes++;}
+        return holes;
+    }
+    if (mySize>0) return 1;
+    else return 0;
 }
 
 char mem_is_alloc(void *ptr)
 {
-    return 0;
+    struct memoryList *trav;
+    trav=head->next;
+    while(trav != NULL) {
+        if (trav->ptr == ptr) {
+            return 'y';
+        }
+        trav = trav->next;
+    }
+    return 'n';
 }
 
 /*
@@ -305,7 +358,11 @@ strategies strategyFromString(char * strategy)
 /* Use this function to print out the current contents of memory. */
 void print_memory()
 {
-    return;
+    struct memoryList *trav = head->next;
+    while (trav != NULL) {
+        printf("%d\t%d\t%d\n", trav->placement, trav->size, trav->alloc);
+        trav = trav->next;
+    }
 }
 
 /* Use this function to track memory allocation performance.
@@ -338,16 +395,50 @@ void try_mymem(int argc, char **argv) {
     initmem(strat,500);
 
     a = mymalloc(100);
-    b = mymalloc(150);
-    printf("%d\n",mem_holes());
-    c = mymalloc(100);
-    myfree(b);
-    d = mymalloc(50);
-    myfree(a);
-    e = mymalloc(25);
-
+    printf("a allocated\n");
     print_memory();
-    print_memory_status();
+    printf("%d bytes are free in %d holes; maximum allocatable block is %d bytes.\n",mem_free(),mem_holes(),mem_largest_free());
+    printf("\n");
+
+    b = mymalloc(150);
+    printf("b allocated\n");
+    print_memory();
+    printf("%d bytes are free in %d holes; maximum allocatable block is %d bytes.\n",mem_free(),mem_holes(),mem_largest_free());
+    printf("\n");
+
+    c = mymalloc(100);
+    printf("c allocated\n");
+    print_memory();
+    printf("%d bytes are free in %d holes; maximum allocatable block is %d bytes.\n",mem_free(),mem_holes(),mem_largest_free());
+    printf("\n");
+
+    myfree(c);
+    printf("c freed\n");
+    print_memory();
+    printf("%d bytes are free in %d holes; maximum allocatable block is %d bytes.\n",mem_free(),mem_holes(),mem_largest_free());
+    printf("\n");
+
+    d = mymalloc(50);
+    printf("d allocated\n");
+    print_memory();
+    printf("%d bytes are free in %d holes; maximum allocatable block is %d bytes.\n",mem_free(),mem_holes(),mem_largest_free());
+    printf("\n");
+
+    myfree(a);
+    printf("a freed\n");
+    print_memory();
+    printf("%d bytes are free in %d holes; maximum allocatable block is %d bytes.\n",mem_free(),mem_holes(),mem_largest_free());
+    printf("\n");
+
+    e = mymalloc(25);
+    printf("e allocated\n");
+    print_memory();
+    printf("%d bytes are free in %d holes; maximum allocatable block is %d bytes.\n",mem_free(),mem_holes(),mem_largest_free());
+    printf("\n");
+
+
+    //print_memory();
+    //print_memory_status();
 
 }
 
