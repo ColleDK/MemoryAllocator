@@ -32,7 +32,7 @@ void *myMemory = NULL;
 
 static struct memoryList *head;
 static struct memoryList *next;
-static struct memoryList *latest;
+static struct memoryList *latest; // i use latest to point to the last one that was allocated that is not freed
 
 
 /* initmem must be called prior to mymalloc and myfree.
@@ -60,6 +60,7 @@ void initmem(strategies strategy, size_t sz)
 
     /* TODO: release any other memory you were using for bookkeeping when doing a re-initialization! */
 
+    // here i free all the stuff in memory that was still active
     if (head != NULL) {
         struct memoryList *trav;
         for (trav = head->next; trav->next != NULL; trav = trav->next) {
@@ -70,6 +71,8 @@ void initmem(strategies strategy, size_t sz)
     myMemory = malloc(sz);
 
     /* TODO: Initialize memory management structure. */
+
+    // reinitialize my structs
     head = (struct memoryList*) malloc(sizeof (struct memoryList));
     head->prev = NULL;
     head->next = NULL;
@@ -78,7 +81,13 @@ void initmem(strategies strategy, size_t sz)
     head->alloc = 0;  // not allocated
     head->ptr = myMemory;  // points to the same memory adress as the memory pool
 
-
+    latest = (struct memoryList*) malloc(sizeof(struct memoryList));
+    latest->prev = NULL;
+    latest->next = NULL;
+    latest->placement = -1; // not in memory
+    latest->size = NULL; // initialy the first block size is equals to the memory pool size.
+    latest->alloc = 0;  // not allocated
+    latest->ptr = NULL;
 }
 
 /* Allocate a block of memory with the requested size.
@@ -89,6 +98,7 @@ void initmem(strategies strategy, size_t sz)
 
 void *mymalloc(size_t requested)
 {
+    // i first check if there is enough space in the whole memory (without considering used space), if not return NULL
     if (requested > mySize){return NULL;}
     assert((int)myStrategy > 0);
 
@@ -103,11 +113,16 @@ void *mymalloc(size_t requested)
         case Worst:
             return NULL;
         case Next: {
-            struct memoryList *trav;
-            trav=head;
+            //first i check if there is a big enough block of free space, if not return NULL
             if (mem_largest_free() < requested){return NULL;}
 
+            //i create a struct that i will use as a traversal pointer. It points to head
+            struct memoryList *trav;
+            trav=head;
+
+            // first check if there is max amount of space available (first thing to be allocated)
             if (mySize == trav->size){
+                // create a struct and call it temp and set given parameters
                 struct memoryList *temp = (struct memoryList*) malloc(sizeof (struct memoryList));
                 temp->size=requested;
                 temp->prev=head;
@@ -115,27 +130,26 @@ void *mymalloc(size_t requested)
                 temp->alloc=1;
                 temp->next=NULL;
                 temp->ptr=temp;
-                temp->previousAllocated = NULL;
-                mySize=mySize-requested;
-                head->next=temp;
-                latest=temp;
-                return latest->ptr;
+                temp->previousAllocated = NULL; // here i set the previous to NULL since there is nothing before it
+                mySize=mySize-requested; //reduce the available size in my memory
+                head->next=temp; //change connectivity between structs
+                latest=temp; //set the latest struct allocated to temp
+                return latest->ptr; //here i return the pointer to the latest created struct (temp)
             }
             else{
+                // if something has already been initialized in memory i set the current traversal path to my latest struct (since i have to find the next fit)
                 trav = latest;
-                int startPlacement = trav->placement+trav->size;
-                int thisPlacement = trav->placement+trav->size;
-                if (thisPlacement+requested <= head->size) {
+                int startPlacement = trav->placement+trav->size; // i will use this as a break from an infinite loop COME BACK TO LATER
+                int thisPlacement = trav->placement+trav->size; //i will use this to make some calculations (this is the point in the memory where latest is located at)
+                if (thisPlacement+requested <= head->size && trav->next == NULL) { // if there is still space available in the memory (before i have to loop) and nothing is to the right
+                    // lav en struct og giv den de rigtige parametre
                     struct memoryList *temp = (struct memoryList *) malloc(sizeof(struct memoryList));
                     temp->size = requested;
                     temp->prev = trav;
                     temp->placement = thisPlacement;
                     temp->alloc = 1;
-                    temp->next = trav->next;
-                    temp->previousAllocated=trav;
-                    if (trav->next != NULL){
-                        trav->next->prev = temp;
-                    }
+                    temp->next = NULL;
+                    temp->previousAllocated=latest;
                     temp->ptr = temp;
                     mySize = mySize - requested;
                     trav->next = temp;
@@ -143,7 +157,34 @@ void *mymalloc(size_t requested)
                     return latest->ptr;
                 }
                 else {
+                    // check up until the end of the memory
+                    while (trav->next != NULL){
+                        if (trav->next->placement - (trav->placement+trav->size) > requested){ // if there is space for the requested memory segment before the next memory locatio
+                            // create struct and give it its parameters
+                            struct memoryList *temp = (struct memoryList *) malloc(sizeof(struct memoryList));
+                            temp->size = requested;
+                            temp->prev = trav->prev;
+                            temp->placement = trav->placement+trav->size;
+                            temp->alloc = 1;
+                            temp->next = trav->next;
+                            temp->ptr = temp;
+                            temp->next->prev = temp;
+                            temp->prev->next=temp;
+                            mySize = mySize - requested;
+                            temp->previousAllocated=latest;
+                            latest = temp;
+                            return latest->ptr;
+                        }
+                        // loop every point after latest
+                        trav = trav->next;
+                    }
+
+
+
+                    // if there is not enough space at the end of the memory, then it means it is before latest
+                    // set current path to first allocated memory.
                     trav = head->next;
+                    // if there is space before that allocated memory then we insert the new memory before
                     if (trav->placement >= requested){
                         struct memoryList *temp = (struct memoryList *) malloc(sizeof(struct memoryList));
                         temp->size = requested;
@@ -155,13 +196,19 @@ void *mymalloc(size_t requested)
                         temp->next->prev = temp;
                         temp->prev->next=temp;
                         mySize = mySize - requested;
+                        temp->previousAllocated=latest;
                         latest = temp;
-                        temp->previousAllocated=trav;
                         return latest->ptr;
                     }
+
+                    // make a counter for how much space there is at the current segment
                     int thisSpace;
+
+                    // while you are not at the same position as start position (looped the whole way around)
                     while (trav->placement + trav->size != startPlacement) {
-                        thisSpace = trav->next->placement - (trav->placement + trav->size + 1);
+                        // current space is from current position + size until next current position
+                        thisSpace = trav->next->placement - (trav->placement + trav->size);
+                        // if there is enough space then we put it in here
                         if (thisSpace >= requested) {
                             struct memoryList *temp = (struct memoryList *) malloc(sizeof(struct memoryList));
                             temp->size = requested;
@@ -181,9 +228,11 @@ void *mymalloc(size_t requested)
                     }
                 }
             }
+            // return NULL if no place has been found
             return NULL;
         }
     }
+    // return NULL if no place has been found
     return NULL;
 }
 
@@ -191,22 +240,22 @@ void *mymalloc(size_t requested)
 /* Frees a block of memory previously allocated by mymalloc. */
 void myfree(void* block)
 {
+    // make a struct for traversing the memory and set it to first place in memory
     struct memoryList *trav;
     trav=head->next;
-    while(trav != NULL) {
-        if (trav->ptr == block) {
-            trav->alloc = 0;
-            trav->prev->next = trav->next;
+    while(trav != NULL) { // check if you hit the end of the memory
+        if (trav->ptr == block) { // check if you found the correct pointer
+            trav->prev->next = trav->next; // connect the previous and next memory to eachother
             if (trav->next != NULL){trav->next->prev = trav->prev;}
-            mySize = mySize+trav->size;
-            if (trav == latest){
+            mySize = mySize+trav->size; // you got some extra space now so we need to declare that
+            if (trav == latest){ // if you used free on the latest you allocated then set the current latest to the previous allocted one
                 latest = trav->previousAllocated;
             }
-            break;
+            free(block); // free the block from the heap
+            break; //if the pointer was found then break the function
         }
-        trav = trav->next;
+        trav = trav->next; //if not the correct pointer check next one
     }
-    free(block);
 }
 
 /****** Memory status/property functions ******
