@@ -118,29 +118,31 @@ void *mymalloc(size_t requested)
                 return temp->ptr;
             }
             else{
-                int startPlacement = trav->next->placement+trav->next->size+1;
-                int thisPlacement = trav->next->placement+trav->next->size+1;
+                trav = latest;
+                int startPlacement = trav->placement+trav->size;
+                int thisPlacement = trav->placement+trav->size;
                 if (thisPlacement+requested < mySize) {
                     struct memoryList *temp = (struct memoryList *) malloc(sizeof(struct memoryList));
                     temp->size = requested;
-                    temp->prev = head->next;
-                    temp->placement = 0;
+                    temp->prev = trav;
+                    temp->placement = thisPlacement;
                     temp->alloc = 1;
                     temp->next = NULL;
                     temp->ptr = temp;
                     mySize = mySize - requested;
-                    head->next->next = temp;
+                    trav->next = temp;
                     latest = temp;
                     return temp->ptr;
                 }
                 else {
-                    while (trav->next->placement + trav->size + 1 != startPlacement) {
+                    trav = head->next;
+                    while (trav->placement + trav->size != startPlacement) {
                         thisPlacement = trav->next->next->placement - (trav->next->placement + trav->next->size + 1);
                         if (thisPlacement > requested + 1) {
                             struct memoryList *temp = (struct memoryList *) malloc(sizeof(struct memoryList));
                             temp->size = requested;
                             temp->prev = trav;
-                            temp->placement = trav->next->placement + trav->next->size + 1;
+                            temp->placement = trav->next->placement + trav->next->size;
                             temp->alloc = 1;
                             temp->next = trav->next->next;
                             temp->ptr = temp;
@@ -186,19 +188,32 @@ void myfree(void* block)
 /* Get the number of contiguous areas of free space in memory. */
 int mem_holes()
 {
-    return 0;
+    struct memoryList *trav;
+    trav=head->next;
+    if(trav == NULL){
+        return 1;
+    }
+    else{
+        int holes = 0;
+        while(trav->next != NULL){
+            if (trav->placement+trav->size+1 != trav->next->placement && trav->next->placement != 0){
+                holes++;
+            }
+            trav = trav->next;
+        }
+    }
 }
 
 /* Get the number of bytes allocated */
 int mem_allocated()
 {
-    return 0;
+    return head->size-mySize;
 }
 
 /* Number of non-allocated bytes */
 int mem_free()
 {
-    return 0;
+    return mySize;
 }
 
 /* Number of bytes in the largest contiguous area of unallocated memory */
@@ -234,7 +249,7 @@ void *mem_pool()
 // Returns the total number of bytes in the memory pool. */
 int mem_total()
 {
-    return mySize;
+    return head->size;
 }
 
 
@@ -324,6 +339,7 @@ void try_mymem(int argc, char **argv) {
 
     a = mymalloc(100);
     b = mymalloc(150);
+    printf("%d\n",mem_holes());
     c = mymalloc(100);
     myfree(b);
     d = mymalloc(50);
