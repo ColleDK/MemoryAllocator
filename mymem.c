@@ -443,7 +443,6 @@ void try_mymem(int argc, char **argv) {
     if(argc > 1)
         strat = strategyFromString(argv[1]);
     else
-        // i just put this as standard because that is my task for the assignment
         strat = Next;
 
 
@@ -453,73 +452,14 @@ void try_mymem(int argc, char **argv) {
     initmem(strat,500);
 
     a = mymalloc(100);
-    printf("a allocated\n");
-    print_memory();
-    printf("%d bytes are free in %d holes; maximum allocatable block is %d bytes.\n",mem_free(),mem_holes(),mem_largest_free());
-    printf("\n");
-
-    b = mymalloc(150);
-    printf("b allocated\n");
-    print_memory();
-    printf("%d bytes are free in %d holes; maximum allocatable block is %d bytes.\n",mem_free(),mem_holes(),mem_largest_free());
-    printf("\n");
-
+    b = mymalloc(100);
     c = mymalloc(100);
-    printf("c allocated\n");
-    print_memory();
-    printf("%d bytes are free in %d holes; maximum allocatable block is %d bytes.\n",mem_free(),mem_holes(),mem_largest_free());
-    printf("\n");
-
-    myfree(c);
-    printf("c freed\n");
-    print_memory();
-    printf("%d bytes are free in %d holes; maximum allocatable block is %d bytes.\n",mem_free(),mem_holes(),mem_largest_free());
-    printf("\n");
-
-    d = mymalloc(50);
-    printf("d allocated\n");
-    print_memory();
-    printf("%d bytes are free in %d holes; maximum allocatable block is %d bytes.\n",mem_free(),mem_holes(),mem_largest_free());
-    printf("\n");
-
-    myfree(a);
-    printf("a freed\n");
-    print_memory();
-    printf("%d bytes are free in %d holes; maximum allocatable block is %d bytes.\n",mem_free(),mem_holes(),mem_largest_free());
-    printf("\n");
-
-    e = mymalloc(150);
-    printf("e allocated\n");
-    print_memory();
-    printf("%d bytes are free in %d holes; maximum allocatable block is %d bytes.\n",mem_free(),mem_holes(),mem_largest_free());
-    printf("\n");
-
-    void* f = mymalloc(100);
-    printf("f allocated\n");
-    print_memory();
-    printf("%d bytes are free in %d holes; maximum allocatable block is %d bytes.\n",mem_free(),mem_holes(),mem_largest_free());
-    printf("\n");
-
     myfree(b);
-    myfree(d);
-    printf("b and d freed\n");
-    print_memory();
-    printf("%d bytes are free in %d holes; maximum allocatable block is %d bytes.\n",mem_free(),mem_holes(),mem_largest_free());
-    printf("\n");
-
-
-    void* g = mymalloc(200);
-    printf("g allocated\n");
-    print_memory();
-    printf("%d bytes are free in %d holes; maximum allocatable block is %d bytes.\n",mem_free(),mem_holes(),mem_largest_free());
-    printf("\n");
-
+    d = mymalloc(50);
+    myfree(a);
+    e = mymalloc(25);
 
     print_memory();
     print_memory_status();
 
-}
-
-int main(){
-    try_mymem(NULL,NULL);
 }
