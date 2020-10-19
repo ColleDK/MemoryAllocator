@@ -206,6 +206,7 @@ void myfree(void* block)
         }
         trav = trav->next;
     }
+    free(block);
 }
 
 /****** Memory status/property functions ******
