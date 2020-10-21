@@ -21,6 +21,7 @@ struct memoryList {
     char alloc;          // 1 if this block is allocated,
     // 0 if this block is free.
     void *ptr;           // location of block in memory pool.
+    void *realPointer;
 };
 
 strategies myStrategy = NotSet;    // Current strategy
@@ -126,7 +127,8 @@ void *mymalloc(size_t requested) {
                 temp->placement=0;
                 temp->alloc=1;
                 temp->next=NULL;
-                temp->ptr=temp;
+                temp->ptr=head->ptr+requested;
+                temp->realPointer=temp;
                 temp->previousAllocated = NULL; // here i set the previous to NULL since there is nothing before it
                 mySize=mySize-requested; //reduce the available size in my memory
                 head->next=temp; //change connectivity between structs
@@ -147,7 +149,8 @@ void *mymalloc(size_t requested) {
                     temp->alloc = 1;
                     temp->next = NULL;
                     temp->previousAllocated=latest;
-                    temp->ptr = temp;
+                    temp->ptr = trav->ptr+temp->placement;
+                    temp->realPointer=temp;
                     mySize = mySize - requested;
                     trav->next = temp;
                     latest = temp;
@@ -156,17 +159,18 @@ void *mymalloc(size_t requested) {
                 else {
                     // check up until the end of the memory
                     while (trav->next != NULL){
-                        if (trav->next->placement - (trav->placement+trav->size) > requested){ // if there is space for the requested memory segment before the next memory locatio
+                        if (trav->next->placement - (trav->placement+trav->size) >= requested){ // if there is space for the requested memory segment before the next memory locatio
                             // create struct and give it its parameters
                             struct memoryList *temp = (struct memoryList *) malloc(sizeof(struct memoryList));
                             temp->size = requested;
-                            temp->prev = trav->prev;
+                            temp->prev = trav;
                             temp->placement = trav->placement+trav->size;
                             temp->alloc = 1;
                             temp->next = trav->next;
-                            temp->ptr = temp;
-                            temp->next->prev = temp;
-                            temp->prev->next=temp;
+                            temp->ptr = trav->ptr+temp->placement;
+                            temp->realPointer=temp;
+                            trav->next = temp;
+                            trav->prev=temp;
                             mySize = mySize - requested;
                             temp->previousAllocated=latest;
                             latest = temp;
@@ -185,13 +189,14 @@ void *mymalloc(size_t requested) {
                     if (trav->placement >= requested){
                         struct memoryList *temp = (struct memoryList *) malloc(sizeof(struct memoryList));
                         temp->size = requested;
-                        temp->prev = trav->prev;
+                        temp->prev = head;
                         temp->placement = 0;
                         temp->alloc = 1;
                         temp->next = trav;
-                        temp->ptr = temp;
-                        temp->next->prev = temp;
-                        temp->prev->next=temp;
+                        temp->ptr = head->ptr+temp->placement;
+                        temp->realPointer=temp;
+                        trav->prev->next = temp;
+                        trav->prev=temp;
                         mySize = mySize - requested;
                         temp->previousAllocated=latest;
                         latest = temp;
@@ -213,7 +218,8 @@ void *mymalloc(size_t requested) {
                             temp->placement = trav->placement + trav->size;
                             temp->alloc = 1;
                             temp->next = trav->next;
-                            temp->ptr = temp;
+                            temp->ptr = trav->ptr+temp->placement;
+                            temp->realPointer=temp;
                             trav->next->prev = temp;
                             trav->next = temp;
                             mySize = mySize - requested;
@@ -247,7 +253,7 @@ void myfree(void* block) {
             if (trav == latest){ // if you used free on the latest you allocated then set the current latest to the previous allocted one
                 latest = trav->previousAllocated;
             }
-            free(block); // free the block from the heap
+            free(trav->realPointer); // free the block from the heap
             break; //if the pointer was found then break the function
         }
         trav = trav->next; //if not the correct pointer check next one
@@ -335,7 +341,7 @@ int mem_small_free(int size) {
             }
             trav = trav->next; //go to next allocated memory
         }
-        if (trav->placement+trav->size < head->size){holes++;} // on the last allocated memory check if there is enough space until you reach the end of the whole memory
+        if (trav->placement+trav->size < head->size && head->size-(trav->placement+trav->size) < size){holes++;} // on the last allocated memory check if there is enough space until you reach the end of the whole memory
         return holes;
     }
     if (mySize>0) return 1; //if no malloc has been initialized check if memory has been initialized, if yes return 1 hole else 0
@@ -418,7 +424,7 @@ void print_memory() {
     // traversal struct
     struct memoryList *trav = head->next;
     while (trav != NULL) { //check if it is NULL
-        printf("Placed at location: %d\tThe size is: %d\tThe memory ends at: %d\n", trav->placement, trav->size,trav->placement+trav->size); //print out some data taken from trav
+        printf("Placed at location: %d\tThe size is: %d\tThe memory ends at: %d\tThe memory is placed at location: %p\n", trav->placement, trav->size,trav->placement+trav->size,trav->ptr); //print out some data taken from trav
         trav = trav->next; //loop until end of memory
     }
 }
