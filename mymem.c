@@ -127,7 +127,7 @@ void *mymalloc(size_t requested) {
                 temp->placement=0;
                 temp->alloc=1;
                 temp->next=NULL;
-                temp->ptr=head->ptr+requested;
+                temp->ptr=head->ptr+temp->placement;
                 temp->realPointer=temp;
                 temp->previousAllocated = NULL; // here i set the previous to NULL since there is nothing before it
                 mySize=mySize-requested; //reduce the available size in my memory
@@ -149,7 +149,7 @@ void *mymalloc(size_t requested) {
                     temp->alloc = 1;
                     temp->next = NULL;
                     temp->previousAllocated=latest;
-                    temp->ptr = trav->ptr+temp->placement;
+                    temp->ptr = head->ptr+temp->placement;
                     temp->realPointer=temp;
                     mySize = mySize - requested;
                     trav->next = temp;
@@ -167,7 +167,7 @@ void *mymalloc(size_t requested) {
                             temp->placement = trav->placement+trav->size;
                             temp->alloc = 1;
                             temp->next = trav->next;
-                            temp->ptr = trav->ptr+temp->placement;
+                            temp->ptr = latest->ptr+(temp->placement-latest->placement);
                             temp->realPointer=temp;
                             trav->next = temp;
                             trav->prev=temp;
@@ -218,7 +218,12 @@ void *mymalloc(size_t requested) {
                             temp->placement = trav->placement + trav->size;
                             temp->alloc = 1;
                             temp->next = trav->next;
-                            temp->ptr = trav->ptr+temp->placement;
+                            if (latest->placement > temp->placement){
+                                temp->ptr = latest->ptr+(latest->placement+temp->placement+requested+1)%head->size;
+                            }
+                            else {
+                                temp->ptr = latest->ptr + (latest->placement - temp->placement);
+                            }
                             temp->realPointer=temp;
                             trav->next->prev = temp;
                             trav->next = temp;
@@ -446,7 +451,7 @@ void print_memory_status() {
 void try_mymem(int argc, char **argv) {
     strategies strat;
     void *a, *b, *c, *d, *e;
-    if(argc > 1)
+    if (argc > 1)
         strat = strategyFromString(argv[1]);
     else
         strat = Next;
