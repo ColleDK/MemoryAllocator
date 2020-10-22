@@ -15,13 +15,13 @@ struct memoryList {
     struct memoryList *prev;
     struct memoryList *next;
 
-    int placement;
+    int placement;       // placement of block on own memory
     void *previousAllocated; //the one allocated before this one
     int size;            // How many bytes in this block?
     char alloc;          // 1 if this block is allocated,
     // 0 if this block is free.
-    void *ptr;           // location of block in memory pool.
-    void *realPointer;
+    void *ptr;           // location of block in my own memory pool.
+    void *realPointer;   // location of block on heap
 };
 
 strategies myStrategy = NotSet;    // Current strategy
@@ -30,7 +30,7 @@ strategies myStrategy = NotSet;    // Current strategy
 size_t mySize;
 void *myMemory = NULL;
 
-static struct memoryList *head;
+static struct memoryList *head; //this will be my general memory block
 static struct memoryList *next;
 static struct memoryList *latest; // i use latest to point to the last one that was allocated that is not freed
 
@@ -57,8 +57,6 @@ void initmem(strategies strategy, size_t sz) {
 
     if (myMemory != NULL) free(myMemory); /* in case this is not the first time initmem2 is called */
 
-    /* TODO: release any other memory you were using for bookkeeping when doing a re-initialization! */
-
     // here i free all the stuff in memory that was still active
     if (head != NULL) {
         struct memoryList *trav;
@@ -68,8 +66,6 @@ void initmem(strategies strategy, size_t sz) {
         free(trav);
     }
     myMemory = malloc(sz);
-
-    /* TODO: Initialize memory management structure. */
 
     // reinitialize my structs
     head = (struct memoryList*) malloc(sizeof (struct memoryList));
@@ -218,18 +214,25 @@ void *mymalloc(size_t requested) {
                             temp->placement = trav->placement + trav->size;
                             temp->alloc = 1;
                             temp->next = trav->next;
-                            if (latest->placement > temp->placement){
+                            if (latest->placement > temp->placement){ // if the last block was closer to the end of the memory than the new one i have to calculate an offset based on their positions
+                                // this is an example of how it calculates the offset
+                                // say we have a block of 100 memory that has been filled to the end but some space have been freed at the front.
+                                // head size would be 100 (size of memory block) and latest placement would be 99 (size of 1 block from 99-100)
+                                // If we want to insert a block onto space 1 with size requested = 1
+                                // temp->ptr = latest->ptr + (99+1+1+1)%100  <== ==> temp->ptr = latest->ptr + 2
+                                // by this calculations we can have a continuous memory location
                                 temp->ptr = latest->ptr+(latest->placement+temp->placement+requested+1)%head->size;
                             }
                             else {
+                                // if the latest block is before this one we just need to calculate the offset onto the new place
                                 temp->ptr = latest->ptr + (latest->placement - temp->placement);
                             }
                             temp->realPointer=temp;
                             trav->next->prev = temp;
                             trav->next = temp;
+                            temp->previousAllocated=latest;
                             mySize = mySize - requested;
                             latest = temp;
-                            temp->previousAllocated=trav;
                             return latest->ptr;
                         }
                         trav = trav->next;
