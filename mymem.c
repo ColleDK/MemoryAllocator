@@ -94,6 +94,8 @@ void initmem(strategies strategy, size_t sz) {
 void *mymalloc(size_t requested) {
     // i first check if there is enough space in the whole memory (without considering used space), if not return NULL
     if (requested > mySize){return NULL;}
+    //first i check if there is a big enough block of free space, if not return NULL
+    if (mem_largest_free() < requested){return NULL;}
     assert((int)myStrategy > 0);
 
     switch (myStrategy)
@@ -107,8 +109,6 @@ void *mymalloc(size_t requested) {
         case Worst:
             return NULL;
         case Next: {
-            //first i check if there is a big enough block of free space, if not return NULL
-            if (mem_largest_free() < requested){return NULL;}
 
             //i create a struct that i will use as a traversal pointer. It points to head
             struct memoryList *trav;
@@ -134,10 +134,10 @@ void *mymalloc(size_t requested) {
             else{
                 // if something has already been initialized in memory i set the current traversal path to my latest struct (since i have to find the next fit)
                 trav = latest;
-                int startPlacement = trav->placement+trav->size; // i will use this as a break from an infinite loop COME BACK TO LATER
+                int startPlacement = trav->placement+trav->size; // i will use this as a break from an infinite loop
                 int thisPlacement = trav->placement+trav->size; //i will use this to make some calculations (this is the point in the memory where latest is located at)
                 if (thisPlacement+requested <= head->size && trav->next == NULL) { // if there is still space available in the memory (before i have to loop) and nothing is to the right
-                    // lav en struct og giv den de rigtige parametre
+                    // create a struct and give its parameters
                     struct memoryList *temp = (struct memoryList *) malloc(sizeof(struct memoryList));
                     temp->size = requested;
                     temp->prev = trav;
@@ -189,7 +189,7 @@ void *mymalloc(size_t requested) {
                         temp->placement = 0;
                         temp->alloc = 1;
                         temp->next = trav;
-                        temp->ptr = head->ptr+temp->placement;
+                        temp->ptr = latest->ptr+(latest->placement+temp->placement+requested+1)%head->size; // this will be explained in the next segment
                         temp->realPointer=temp;
                         trav->prev->next = temp;
                         trav->prev=temp;
@@ -297,8 +297,7 @@ int mem_holes() {
 }
 
 /* Get the number of bytes allocated */
-int mem_allocated()
-{
+int mem_allocated(){
     // the full size minus the size that is not allocated on the memory
     return head->size-mySize;
 }
@@ -357,7 +356,7 @@ int mem_small_free(int size) {
 }
 
 char mem_is_alloc(void *ptr) {
-    // make a struct to travers
+    // make a struct to traverse
     struct memoryList *trav;
     trav=head->next;
     while(trav != NULL) { //check if it is NULL
